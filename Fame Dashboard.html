@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fame Marketing — Sales Intelligence</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0d0f14;--surface:#141720;--surface2:#1c2030;--surface3:#222840;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);
+  --text:#f0f2f7;--muted:#7a8099;--muted2:#4a5068;
+  --blue:#4f7cff;--green:#00d4a0;--red:#ff6b6b;--amber:#ffc947;--purple:#a78bfa;
+  --amazon:#ff9500;--shopify:#00d4a0;--ebay:#4f7cff;--walmart:#ffc947;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;min-height:100vh;}
+/* HEADER */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:100;}
+.logo{display:flex;align-items:center;gap:12px;}
+.logo-mark{width:34px;height:34px;background:var(--blue);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;}
+.logo-name{font-size:15px;font-weight:600;letter-spacing:-0.3px;}
+.logo-sub{font-size:11px;color:var(--muted);margin-top:1px;}
+.hdr-right{display:flex;align-items:center;gap:10px;}
+.sp-status{display:flex;align-items:center;gap:7px;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:500;border:1px solid var(--border2);background:var(--surface2);cursor:pointer;}
+.sp-dot{width:7px;height:7px;border-radius:50%;}
+.sp-dot.connected{background:var(--green);}
+.sp-dot.connecting{background:var(--amber);animation:blink 1s infinite;}
+.sp-dot.disconnected{background:var(--red);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.badge-period{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:500;color:var(--green);font-family:'DM Mono',monospace;}
+.user-badge{background:rgba(79,124,255,0.12);border:1px solid rgba(79,124,255,0.2);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--blue);display:flex;align-items:center;gap:7px;}
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:210px 1fr;min-height:calc(100vh - 61px);}
+/* SIDEBAR */
+.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:18px 14px;overflow-y:auto;}
+.sb-sec{margin-bottom:22px;}
+.sb-label{font-size:10px;font-weight:700;letter-spacing:0.1em;color:var(--muted2);text-transform:uppercase;margin-bottom:10px;padding:0 8px;}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;cursor:pointer;transition:all 0.15s;color:var(--muted);font-size:13px;font-weight:500;margin-bottom:2px;border:1px solid transparent;}
+.nav-item:hover{background:var(--surface2);color:var(--text);}
+.nav-item.active{background:rgba(79,124,255,0.12);color:var(--blue);border-color:rgba(79,124,255,0.2);}
+.chip{display:flex;align-items:center;gap:7px;width:100%;text-align:left;padding:7px 10px;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--muted);font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s;margin-bottom:2px;}
+.chip:hover{background:var(--surface2);color:var(--text);}
+.chip.active{background:var(--surface2);color:var(--text);border-color:var(--border2);}
+.chip-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.reset-btn{width:100%;padding:7px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-size:11px;font-family:'DM Sans',sans-serif;cursor:pointer;margin-top:6px;}
+.reset-btn:hover{background:var(--surface2);}
+/* CONTENT */
+.content{padding:20px 24px;overflow-y:auto;}
+.view{display:none;}.view.active{display:block;}
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;overflow:hidden;}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kpi-color,var(--blue));}
+.kpi-label{font-size:10px;color:var(--muted);font-weight:600;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:6px;}
+.kpi-val{font-size:20px;font-weight:600;letter-spacing:-0.5px;font-family:'DM Mono',monospace;}
+.kpi-meta{font-size:11px;margin-top:4px;}
+.up{color:var(--green);}.dn{color:var(--red);}.warn{color:var(--amber);}.neu{color:var(--muted);}
+/* CARDS */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+.g1{margin-bottom:14px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+.card-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;}
+.card-title{font-size:13px;font-weight:600;}
+.card-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.cw{position:relative;}
+.cw-180{height:180px;}.cw-220{height:220px;}.cw-240{height:240px;}.cw-260{height:260px;}
+/* AI */
+.ai-card{background:var(--surface);border:1px solid rgba(79,124,255,0.2);border-radius:12px;padding:16px 18px;margin-bottom:14px;}
+.ai-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.ai-icon{width:30px;height:30px;background:rgba(79,124,255,0.12);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.ai-title{font-size:13px;font-weight:600;color:var(--blue);}
+.ai-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.ai-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.ai-block{background:var(--surface2);border-radius:9px;padding:13px 15px;}
+.ai-block-title{font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted2);margin-bottom:8px;}
+.ai-text{font-size:12px;line-height:1.75;color:var(--text);}
+.hi{color:var(--green);font-weight:500;}.wi{color:var(--amber);font-weight:500;}.di{color:var(--red);font-weight:500;}
+.ins-list{list-style:none;}
+.ins-list li{font-size:12px;line-height:1.6;padding:4px 0;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:flex-start;}
+.ins-list li:last-child{border-bottom:none;}
+.ins-arr{color:var(--blue);flex-shrink:0;}
+/* PLATFORM */
+.plat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+.plat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;}
+.plat-name{font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;}
+.plat-val{font-size:18px;font-weight:600;font-family:'DM Mono',monospace;margin-bottom:4px;}
+.plat-meta{font-size:11px;color:var(--muted);line-height:1.8;}
+.plat-bar{height:3px;border-radius:2px;margin-top:10px;}
+/* TABLE */
+.tbl-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;}
+th{font-size:10px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);padding:8px 10px;text-align:right;border-bottom:1px solid var(--border2);}
+th:first-child,th:nth-child(2){text-align:left;}
+td{padding:8px 10px;text-align:right;font-size:12px;font-family:'DM Mono',monospace;border-bottom:1px solid var(--border);color:var(--text);}
+td:first-child,td:nth-child(2){text-align:left;font-family:'DM Sans',sans-serif;font-weight:500;font-size:12px;}
+tr:last-child td{border-bottom:none;}
+.tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;font-family:'DM Sans',sans-serif;}
+.tag-g{background:rgba(0,212,160,0.12);color:var(--green);}
+.tag-r{background:rgba(255,107,107,0.12);color:var(--red);}
+.tag-w{background:rgba(255,201,71,0.12);color:var(--amber);}
+/* DATA ENTRY */
+.de-wrap{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+.de-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;}
+.de-panel-title{font-size:13px;font-weight:600;margin-bottom:4px;}
+.de-panel-sub{font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.6;}
+.de-sec-label{font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted2);margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border);}
+.de-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.de-field{display:flex;flex-direction:column;gap:4px;}
+.de-label{font-size:11px;color:var(--muted);font-weight:500;}
+.de-input{background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:8px 10px;color:var(--text);font-size:12px;font-family:'DM Mono',monospace;transition:border-color 0.15s;width:100%;}
+.de-input:focus{outline:none;border-color:rgba(79,124,255,0.5);}
+.de-input::placeholder{color:var(--muted2);}
+.de-input.full{grid-column:1/-1;}
+.plat-tabs{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap;}
+.plat-tab{padding:6px 12px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s;}
+.plat-tab:hover{background:var(--surface2);}
+.plat-tab.active{color:#fff;}
+.plat-tab[data-plat="TOTAL"].active{background:#2C3E50;border-color:#2C3E50;}
+.plat-tab[data-plat="Amazon"].active{background:#854D0E;border-color:#854D0E;}
+.plat-tab[data-plat="Shopify"].active{background:#14532D;border-color:#14532D;}
+.plat-tab[data-plat="eBay"].active{background:#1E3A5F;border-color:#1E3A5F;}
+.plat-tab[data-plat="Walmart"].active{background:#713F12;border-color:#713F12;}
+.de-actions{display:flex;align-items:center;margin-top:14px;gap:8px;}
+.btn-primary{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;transition:opacity 0.15s;}
+.btn-primary:hover{opacity:0.85;}
+.btn-sp{background:rgba(0,212,160,0.15);color:var(--green);border:1px solid rgba(0,212,160,0.3);border-radius:8px;padding:10px 16px;font-size:12px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;}
+.btn-sp:hover{background:rgba(0,212,160,0.25);}
+.btn-secondary{background:transparent;color:var(--muted);border:1px solid var(--border2);border-radius:8px;padding:10px 16px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;}
+.de-feedback{font-size:12px;margin-left:4px;opacity:0;transition:opacity 0.3s;}
+.de-feedback.show{opacity:1;}
+/* SP CONNECT MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;display:flex;align-items:center;justify-content:center;display:none;}
+.modal-bg.show{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:28px;width:480px;max-width:90vw;}
+.modal-title{font-size:16px;font-weight:600;margin-bottom:6px;}
+.modal-sub{font-size:12px;color:var(--muted);margin-bottom:20px;line-height:1.6;}
+.modal-field{margin-bottom:12px;}
+.modal-label{font-size:11px;color:var(--muted);font-weight:500;margin-bottom:5px;}
+.modal-input{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;font-family:'DM Mono',monospace;}
+.modal-input:focus{outline:none;border-color:rgba(79,124,255,0.5);}
+.modal-actions{display:flex;gap:8px;margin-top:20px;}
+.modal-info{background:rgba(79,124,255,0.08);border:1px solid rgba(79,124,255,0.2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:var(--muted);line-height:1.7;}
+.modal-info span{color:var(--blue);}
+/* LOADING */
+.loading-overlay{position:fixed;inset:0;background:rgba(13,15,20,0.85);z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;display:none;}
+.loading-overlay.show{display:flex;}
+.loading-spinner{width:40px;height:40px;border:3px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:16px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-size:14px;color:var(--muted);}
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loading">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loading-text">SharePoint'e bağlanıyor...</div>
+</div>
+
+<!-- SP MODAL -->
+<div class="modal-bg" id="sp-modal">
+  <div class="modal">
+    <div class="modal-title">SharePoint Bağlantısı</div>
+    <div class="modal-sub">Microsoft Graph API üzerinden Excel dosyanıza bağlanın. M365 hesabınızla giriş yapmanız gerekecek.</div>
+    <div class="modal-info">
+      <span>Tenant ID:</span> cc53c229-a618-4644-9adb-39716e97b088<br>
+      <span>Client ID:</span> ca446765-d9f1-49b3-a96a-ea92f258d7ba<br>
+      <span>Site:</span> famemarketingllc.sharepoint.com/sites/AccountManagement<br>
+      <span>Dosya:</span> Sales-Advertisement_Report.xlsx
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">Excel Dosya Adı (Data sayfasının bulunduğu dosya)</div>
+      <input class="modal-input" id="sp-filename" value="Sales-Advertisement_Report.xlsx" placeholder="Sales-Advertisement_Report.xlsx">
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">Data Sayfası Adı</div>
+      <input class="modal-input" id="sp-sheetname" value="Data" placeholder="Data">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="connectSharePoint()">Microsoft ile Giriş Yap & Bağlan</button>
+      <button class="btn-secondary" onclick="closeModal()">İptal</button>
+    </div>
+  </div>
+</div>
+
+<div class="hdr">
+  <div class="logo">
+    <div class="logo-mark">FM</div>
+    <div>
+      <div class="logo-name">Fame Marketing LLC</div>
+      <div class="logo-sub">Sales Intelligence Dashboard</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="sp-status" onclick="showModal()" id="sp-status-btn">
+      <div class="sp-dot disconnected" id="sp-dot"></div>
+      <span id="sp-status-text">SharePoint Bağlı Değil</span>
+    </div>
+    <div class="badge-period" id="badge-period">2026 — Oca & Şub</div>
+    <div class="user-badge" id="user-badge">◈ Giriş yapılmadı</div>
+  </div>
+</div>
+
+<div class="layout">
+<div class="sidebar">
+  <div class="sb-sec">
+    <div class="sb-label">Görünüm</div>
+    <div class="nav-item active" onclick="gotoView('overview',this)"><span>◈</span> Genel Bakış</div>
+    <div class="nav-item" onclick="gotoView('trend',this)"><span>↗</span> Trend</div>
+    <div class="nav-item" onclick="gotoView('category',this)"><span>◉</span> Kategori</div>
+    <div class="nav-item" onclick="gotoView('platform',this)"><span>▦</span> Platform</div>
+    <div class="nav-item" onclick="gotoView('dataentry',this)"><span>＋</span> Veri Girişi</div>
+  </div>
+  <div class="sb-sec" id="sb-year">
+    <div class="sb-label">Yıl</div>
+    <button class="chip active" onclick="setF('year','all',this)">Tüm Yıllar</button>
+    <button class="chip" onclick="setF('year','2026',this)">2026 (YTD)</button>
+    <button class="chip" onclick="setF('year','2025',this)">2025</button>
+    <button class="chip" onclick="setF('year','2024',this)">2024</button>
+  </div>
+  <div class="sb-sec" id="sb-plat">
+    <div class="sb-label">Platform</div>
+    <button class="chip active" onclick="setF('plat','all',this)">Tüm Platformlar</button>
+    <button class="chip" onclick="setF('plat','Amazon',this)"><span class="chip-dot" style="background:var(--amazon)"></span>Amazon</button>
+    <button class="chip" onclick="setF('plat','Shopify',this)"><span class="chip-dot" style="background:var(--shopify)"></span>Shopify</button>
+    <button class="chip" onclick="setF('plat','eBay',this)"><span class="chip-dot" style="background:var(--ebay)"></span>eBay</button>
+    <button class="chip" onclick="setF('plat','Walmart',this)"><span class="chip-dot" style="background:var(--walmart)"></span>Walmart</button>
+  </div>
+  <div class="sb-sec" id="sb-cat">
+    <div class="sb-label">Kategori</div>
+    <button class="chip active" onclick="setF('cat','all',this)">Tüm Kategoriler</button>
+    <button class="chip" onclick="setF('cat','foam',this)"><span class="chip-dot" style="background:#4f7cff"></span>Foam+Set</button>
+    <button class="chip" onclick="setF('cat','gun',this)"><span class="chip-dot" style="background:#00d4a0"></span>Foam Gun</button>
+    <button class="chip" onclick="setF('cat','glue',this)"><span class="chip-dot" style="background:#ff6b6b"></span>CA Glue</button>
+    <button class="chip" onclick="setF('cat','shine',this)"><span class="chip-dot" style="background:#ffc947"></span>Balloon Shine</button>
+    <button class="chip" onclick="setF('cat','arb',this)"><span class="chip-dot" style="background:#a78bfa"></span>Arbitrage</button>
+    <button class="reset-btn" onclick="resetF()">↺ Sıfırla</button>
+  </div>
+</div>
+
+<div class="content">
+
+<!-- OVERVIEW -->
+<div class="view active" id="view-overview">
+  <div class="kpi-row" id="kpi-row"></div>
+  <div class="ai-card">
+    <div class="ai-hdr">
+      <div class="ai-icon">◈</div>
+      <div><div class="ai-title">AI Analiz — Claude</div><div class="ai-sub" id="ai-sub">Seçili dönem özeti</div></div>
+    </div>
+    <div class="ai-grid" id="ai-grid"></div>
+  </div>
+  <div class="g2">
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-hdr"><div><div class="card-title">Aylık Satış & Reklam</div><div class="card-sub" id="main-chart-sub">Seçili filtreler</div></div></div>
+      <div class="cw cw-240"><canvas id="c-main"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title">Gross Margin %</div></div></div>
+      <div class="cw cw-180"><canvas id="c-margin"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title">ROAS</div></div></div>
+      <div class="cw cw-180"><canvas id="c-roas"></canvas></div>
+    </div>
+  </div>
+  <div class="card g1">
+    <div class="card-hdr"><div class="card-title">Aylık Detay</div></div>
+    <div class="tbl-wrap"><table id="tbl-main"></table></div>
+  </div>
+</div>
+
+<!-- TREND -->
+<div class="view" id="view-trend">
+  <div class="g1 card">
+    <div class="card-hdr"><div><div class="card-title">3 Yıllık Satış Karşılaştırması</div><div class="card-sub">2024 · 2025 · 2026</div></div></div>
+    <div class="cw cw-260"><canvas id="c-yoy-s"></canvas></div>
+  </div>
+  <div class="g2">
+    <div class="card"><div class="card-hdr"><div class="card-title">Gross Profit</div></div><div class="cw cw-220"><canvas id="c-yoy-gp"></canvas></div></div>
+    <div class="card"><div class="card-hdr"><div class="card-title">Margin %</div></div><div class="cw cw-220"><canvas id="c-yoy-m"></canvas></div></div>
+    <div class="card"><div class="card-hdr"><div class="card-title">ROAS</div></div><div class="cw cw-220"><canvas id="c-yoy-r"></canvas></div></div>
+    <div class="card"><div class="card-hdr"><div class="card-title">Sipariş Adedi</div></div><div class="cw cw-220"><canvas id="c-yoy-o"></canvas></div></div>
+  </div>
+</div>
+
+<!-- CATEGORY -->
+<div class="view" id="view-category">
+  <div class="g2">
+    <div class="card"><div class="card-hdr"><div><div class="card-title">Kategori Dağılımı</div><div class="card-sub" id="cat-sub">Seçili dönem</div></div></div><div class="cw cw-240"><canvas id="c-cat-pie"></canvas></div></div>
+    <div class="card"><div class="card-hdr"><div><div class="card-title">Kategori ROAS</div></div></div><div class="cw cw-240"><canvas id="c-cat-roas"></canvas></div></div>
+    <div class="card" style="grid-column:1/-1"><div class="card-hdr"><div class="card-title">Kategori Aylık Satış</div></div><div class="cw cw-240"><canvas id="c-cat-trend"></canvas></div></div>
+    <div class="card" style="grid-column:1/-1"><div class="card-hdr"><div class="card-title">Kategori Aylık Reklam</div></div><div class="cw cw-200"><canvas id="c-cat-adv"></canvas></div></div>
+  </div>
+</div>
+
+<!-- PLATFORM -->
+<div class="view" id="view-platform">
+  <div class="plat-row" id="plat-cards"></div>
+  <div class="g2">
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-hdr"><div><div class="card-title">Platform Karşılaştırması</div><div class="card-sub" id="plat-period-sub">Seçili dönem</div></div></div>
+      <div class="cw cw-240"><canvas id="c-plat-bar"></canvas></div>
+    </div>
+    <div class="card"><div class="card-hdr"><div class="card-title">Platform Satış Payı</div></div><div class="cw cw-220"><canvas id="c-plat-pie"></canvas></div></div>
+    <div class="card"><div class="card-hdr"><div class="card-title">Platform GP Karşılaştırması</div></div><div class="cw cw-220"><canvas id="c-plat-gp"></canvas></div></div>
+  </div>
+  <div class="card g1">
+    <div class="card-hdr"><div class="card-title" id="plat-tbl-title">Platform Detay</div></div>
+    <div class="tbl-wrap"><table id="tbl-plat"></table></div>
+  </div>
+</div>
+
+<!-- DATA ENTRY -->
+<div class="view" id="view-dataentry">
+  <div class="g1">
+    <div class="card">
+      <div class="de-panel-title">Aylık Veri Girişi</div>
+      <div class="de-panel-sub">Her platform için ayrı ayrı girin. TOTAL satırını son doldurun. SharePoint bağlıysa "SP'ye Kaydet" ile direkt Excel'e yazılır.</div>
+
+      <div class="de-grid" style="margin-bottom:14px;">
+        <div class="de-field">
+          <label class="de-label">Ay</label>
+          <select class="de-input" id="de-month">
+            <option value="Ocak">Ocak</option><option value="Şubat">Şubat</option><option value="Mart" selected>Mart</option>
+            <option value="Nisan">Nisan</option><option value="Mayıs">Mayıs</option><option value="Haziran">Haziran</option>
+            <option value="Temmuz">Temmuz</option><option value="Ağustos">Ağustos</option><option value="Eylül">Eylül</option>
+            <option value="Ekim">Ekim</option><option value="Kasım">Kasım</option><option value="Aralık">Aralık</option>
+          </select>
+        </div>
+        <div class="de-field">
+          <label class="de-label">Yıl</label>
+          <select class="de-input" id="de-year"><option value="2026" selected>2026</option><option value="2025">2025</option></select>
+        </div>
+      </div>
+
+      <div class="plat-tabs" id="plat-tabs">
+        <button class="plat-tab active" data-plat="TOTAL" onclick="switchPlatTab(this)">TOTAL</button>
+        <button class="plat-tab" data-plat="Amazon" onclick="switchPlatTab(this)">Amazon</button>
+        <button class="plat-tab" data-plat="Shopify" onclick="switchPlatTab(this)">Shopify</button>
+        <button class="plat-tab" data-plat="eBay" onclick="switchPlatTab(this)">eBay</button>
+        <button class="plat-tab" data-plat="Walmart" onclick="switchPlatTab(this)">Walmart</button>
+      </div>
+
+      <div id="plat-form"></div>
+
+      <div class="de-actions">
+        <button class="btn-primary" onclick="saveLocal()">Kaydet & Grafikleri Güncelle</button>
+        <button class="btn-sp" onclick="saveToSharePoint()" id="btn-sp-save">☁ SP'ye Kaydet</button>
+        <button class="btn-secondary" onclick="clearPlatForm()">Temizle</button>
+        <span class="de-feedback" id="de-feedback"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr"><div class="card-title">Girilen Veriler (Bu Oturum)</div></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Ay/Yıl</th><th>Platform</th><th>Satış</th><th>Units</th><th>COGS</th><th>Ads</th><th>Fees</th><th>GP</th><th>Margin</th></tr></thead><tbody id="tbl-entries"></tbody></table></div>
+  </div>
+</div>
+
+</div><!-- content -->
+</div><!-- layout -->
+
+<script>
+// ── CONFIG ──
+const CONFIG = {
+  tenantId: 'cc53c229-a618-4644-9adb-39716e97b088',
+  clientId: 'ca446765-d9f1-49b3-a96a-ea92f258d7ba',
+  siteUrl: 'famemarketingllc.sharepoint.com/sites/AccountManagement',
+  fileId: '5b943c45-d063-4b5c-af7c-fab78b820fee',
+  sheetName: 'Data',
+  scopes: ['Files.ReadWrite', 'Sites.Read.All', 'User.Read']
+};
+
+const MN=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+const CI={};
+let msalInstance=null, accessToken=null, spConnected=false;
+let F={year:'2026',plat:'all',cat:'all'};
+let activePlatTab='TOTAL';
+const ENTRIES=[];
+
+// ── BASE DATA ──
+const BASE={
+  2024:{sales:[59929,57361,68800,92353,147650,163233,116207,155500,229413,328864,320147,298901],adv:[6460,5808,5651,5420,9347,15619,8904,20417,30430,34177,35210,40064],gp:[75,-55,2389,10580,41431,36177,18988,30416,50580,87541,77462,51472],margin:[0.12,-0.10,3.47,11.46,28.06,22.16,16.34,19.56,22.05,26.62,24.20,17.22],roas:[null,null,null,null,null,null,null,null,null,null,null,null],orders:[1175,1041,1421,2646,2534,2907,3010,4128,5383,6356,6548,6135]},
+  2025:{sales:[246831,352428,440720,394479,510461,460463,553247,654570,701971,990707,1158768,709861],adv:[34079,34956,37255,40266,57157,84429,91191,101347,115912,159804,199161,122772],gp:[26797,85448,155543,109743,93123,88477,107983,130108,136452,214351,230244,104881],margin:[10.86,24.25,35.29,27.82,18.24,19.21,19.52,19.88,19.44,21.64,19.87,14.77],roas:[7.24,10.08,11.83,9.80,8.93,5.45,6.07,6.46,6.06,6.20,5.82,5.78],orders:[6833,7188,8489,9106,9940,8397,11189,13392,16490,18487,19479,14739]},
+  2026:{sales:[889263,934255,0,0,0,0,0,0,0,0,0,0],adv:[166171,165156,0,0,0,0,0,0,0,0,0,0],gp:[143031,178874,0,0,0,0,0,0,0,0,0,0],margin:[16.08,19.15,0,0,0,0,0,0,0,0,0,0],roas:[5.35,5.66,0,0,0,0,0,0,0,0,0,0],orders:[18324,18244,0,0,0,0,0,0,0,0,0,0]}
+};
+
+const CAT={
+  2025:{foam:{s:[86502,193631,274186,241783,298406,279281,312445,401774,418602,677068,810925,259513],a:[12116,16095,22500,26248,37545,63056,63545,66362,68472,80427,91122,39762]},gun:{s:[48106,43326,38781,35213,54278,60323,63603,54972,68289,84128,99996,72569],a:[6373,4820,3478,3864,5055,5535,6942,8118,10785,12944,15461,12315]},glue:{s:[25976,23427,25661,20890,22256,21734,29992,40366,50929,61631,60159,62812],a:[9034,7149,5671,4364,5209,4824,10601,15392,20653,19504,19590,18928]},shine:{s:[17691,25852,30039,30882,45459,45107,36828,54265,60717,55656,44480,23201],a:[6556,6213,5235,5789,9112,11340,9416,10283,12759,12382,12763,7477]},arb:{s:[68484,66037,72162,65515,89857,53294,108724,99584,102249,110822,103242,127090],a:[2890,2648,3154,3145,3571,2007,4046,3742,4026,4572,4568,5018]}},
+  2026:{foam:{s:[425728,572031,0,0,0,0,0,0,0,0,0,0],a:[44047,70747,0,0,0,0,0,0,0,0,0,0]},gun:{s:[83223,65370,0,0,0,0,0,0,0,0,0,0],a:[15362,14631,0,0,0,0,0,0,0,0,0,0]},glue:{s:[66948,67109,0,0,0,0,0,0,0,0,0,0],a:[23406,21793,0,0,0,0,0,0,0,0,0,0]},shine:{s:[30269,48266,0,0,0,0,0,0,0,0,0,0],a:[10190,12147,0,0,0,0,0,0,0,0,0,0]},arb:{s:[178199,157778,0,0,0,0,0,0,0,0,0,0],a:[490,606,0,0,0,0,0,0,0,0,0,0]}},
+  2024:{foam:{s:new Array(12).fill(null),a:new Array(12).fill(null)},gun:{s:new Array(12).fill(null),a:new Array(12).fill(null)},glue:{s:new Array(12).fill(null),a:new Array(12).fill(null)},shine:{s:new Array(12).fill(null),a:new Array(12).fill(null)},arb:{s:new Array(12).fill(null),a:new Array(12).fill(null)}}
+};
+
+// Platform data by month
+const PLAT_DATA={
+  '2026-1':{Amazon:{sales:615690,units:17414,cogs:228877,adv:93495,fees:192226,gp:101092,margin:16.42,ship:0},Shopify:{sales:145691,units:456,cogs:43246,adv:41715,fees:4371,gp:36540,margin:25.08,ship:19819},eBay:{sales:44685,units:325,cogs:15096,adv:11565,fees:6771,gp:2581,margin:5.77,ship:8673},Walmart:{sales:39616,units:332,cogs:10424,adv:2302,fees:6128,gp:13924,margin:35.15,ship:6838}},
+  '2026-2':{Amazon:{sales:704262,units:17131,cogs:240797,adv:109574,fees:211739,gp:125829,margin:17.87,ship:0},Shopify:{sales:145691,units:456,cogs:43246,adv:41715,fees:4371,gp:36540,margin:25.08,ship:19819},eBay:{sales:44685,units:325,cogs:15096,adv:11565,fees:6771,gp:2581,margin:5.77,ship:8673},Walmart:{sales:39616,units:332,cogs:10424,adv:2302,fees:6128,gp:13924,margin:35.15,ship:6838}}
+};
+
+// ── MSAL / GRAPH ──
+function loadMSAL(){
+  return new Promise((resolve)=>{
+    if(window.msal){resolve();return;}
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/microsoft-authentication-library/2.38.0/msal-browser.min.js';
+    s.onload=resolve;
+    document.head.appendChild(s);
+  });
+}
+
+async function connectSharePoint(){
+  closeModal();
+  showLoading('Microsoft hesabınıza giriş yapılıyor...');
+  try{
+    await loadMSAL();
+    msalInstance=new msal.PublicClientApplication({
+      auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:window.location.origin+window.location.pathname},
+      cache:{cacheLocation:'sessionStorage'}
+    });
+    await msalInstance.initialize();
+    const resp=await msalInstance.loginPopup({scopes:CONFIG.scopes});
+    accessToken=resp.accessToken;
+    const acc=msalInstance.getAllAccounts()[0];
+    document.getElementById('user-badge').textContent='◈ '+acc.name;
+    showLoading('Excel verisi okunuyor...');
+    await loadFromSharePoint();
+    setSpStatus('connected','SharePoint Bağlı');
+    spConnected=true;
+    hideLoading();
+  }catch(e){
+    hideLoading();
+    setSpStatus('disconnected','Bağlantı Hatası');
+    alert('Giriş hatası: '+e.message+'\n\nNot: Redirect URI olarak portal.azure.com\'da localhost eklenmiş olmalı.');
+  }
+}
+
+async function getToken(){
+  if(!msalInstance)return null;
+  try{
+    const acc=msalInstance.getAllAccounts()[0];
+    const r=await msalInstance.acquireTokenSilent({scopes:CONFIG.scopes,account:acc});
+    return r.accessToken;
+  }catch{
+    const r=await msalInstance.acquireTokenPopup({scopes:CONFIG.scopes});
+    return r.accessToken;
+  }
+}
+
+async function loadFromSharePoint(){
+  const token=await getToken();
+  const url=`https://graph.microsoft.com/v1.0/drives/root/items/${CONFIG.fileId}/workbook/worksheets/${CONFIG.sheetName}/usedRange`;
+  const res=await fetch(url,{headers:{Authorization:`Bearer ${token}`}});
+  if(!res.ok)throw new Error('Excel okunamadı: '+res.statusText);
+  const data=await res.json();
+  parseSheetData(data.values);
+}
+
+function parseSheetData(rows){
+  // rows[0]=title, rows[1]=section headers, rows[2]=column headers, rows[3+]=data
+  for(let i=3;i<rows.length;i++){
+    const r=rows[i];
+    if(!r[0]||!r[1]||!r[2])continue;
+    const yr=parseInt(r[0]);
+    const mo=MN.indexOf(r[1]);
+    const plat=r[2];
+    if(mo<0||!BASE[yr])continue;
+    if(plat==='TOTAL'){
+      if(r[3])BASE[yr].sales[mo]=parseFloat(r[3])||0;
+      if(r[4])BASE[yr].orders[mo]=parseFloat(r[4])||0;
+      if(r[6])BASE[yr].adv[mo]=parseFloat(r[6])||0;
+      if(r[8])BASE[yr].gp[mo]=parseFloat(r[8])||0;
+      if(r[9])BASE[yr].margin[mo]=parseFloat(r[9])||0;
+      if(r[11])BASE[yr].roas[mo]=parseFloat(r[11])||null;
+      if(r[12])BASE[yr].orders[mo]=parseFloat(r[12])||0;
+      // categories
+      const catKeys=['foam','gun','glue','shine','arb'];
+      const catCols=[13,16,19,22,25];
+      catCols.forEach((col,ci)=>{
+        if(CAT[yr]&&r[col])CAT[yr][catKeys[ci]].s[mo]=parseFloat(r[col])||0;
+        if(CAT[yr]&&r[col+1])CAT[yr][catKeys[ci]].a[mo]=parseFloat(r[col+1])||0;
+      });
+    } else {
+      const key=`${yr}-${mo+1}`;
+      if(!PLAT_DATA[key])PLAT_DATA[key]={};
+      PLAT_DATA[key][plat]={
+        sales:parseFloat(r[3])||0,units:parseFloat(r[4])||0,cogs:parseFloat(r[5])||0,
+        adv:parseFloat(r[6])||0,fees:parseFloat(r[7])||0,gp:parseFloat(r[8])||0,
+        margin:parseFloat(r[9])||0,ship:parseFloat(r[10])||0
+      };
+    }
+  }
+  refreshView();
+}
+
+async function saveToSharePoint(){
+  if(!spConnected){showModal();return;}
+  const entry=collectFormData();
+  if(!entry){return;}
+  showLoading('SharePoint\'e kaydediliyor...');
+  try{
+    const token=await getToken();
+    // Find next empty row
+    const url=`https://graph.microsoft.com/v1.0/drives/root/items/${CONFIG.fileId}/workbook/worksheets/${CONFIG.sheetName}/usedRange`;
+    const res=await fetch(url,{headers:{Authorization:`Bearer ${token}`}});
+    const data=await res.json();
+    const nextRow=data.rowCount+1;
+    const row=buildExcelRow(entry);
+    const addUrl=`https://graph.microsoft.com/v1.0/drives/root/items/${CONFIG.fileId}/workbook/worksheets/${CONFIG.sheetName}/cell(row=${nextRow},column=1)`;
+    // Write row values using range
+    const rangeUrl=`https://graph.microsoft.com/v1.0/drives/root/items/${CONFIG.fileId}/workbook/worksheets/${CONFIG.sheetName}/range(address='A${nextRow+3}:AJ${nextRow+3}')`;
+    await fetch(rangeUrl,{method:'PATCH',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({values:[row]})});
+    hideLoading();
+    showFeedback('✓ SharePoint\'e kaydedildi!','var(--green)');
+    injectEntry(entry);
+    refreshView();
+  }catch(e){
+    hideLoading();
+    showFeedback('✗ Hata: '+e.message,'var(--red)');
+  }
+}
+
+function buildExcelRow(e){
+  return[e.year,e.month,e.plat,e.sales,e.units,e.cogs,e.adv,e.fees,e.gp,e.margin,e.ship,e.roas,e.orders,e.foam_s,e.foam_a,e.foam_u,e.gun_s,e.gun_a,e.gun_u,e.glue_s,e.glue_a,e.glue_u,e.shine_s,e.shine_a,e.shine_u,e.arb_s,e.arb_a,e.arb_u,e.eth_s,e.eth_a,e.eth_u,e.other_s,e.other_a,e.other_u,e.ws_s,e.ws_a,e.ws_u];
+}
+
+// ── FORM ──
+const PLAT_FIELDS={
+  TOTAL:[
+    {key:'sales',label:'Toplam Satış ($)',full:false},{key:'units',label:'Toplam Units',full:false},
+    {key:'cogs',label:'COGS ($)',full:false},{key:'adv',label:'Reklam ($)',full:false},
+    {key:'fees',label:'Amazon Fees ($)',full:false},{key:'gp',label:'Gross Profit ($)',full:false},
+    {key:'margin',label:'Gross Margin (%)',full:false},{key:'ship',label:'Shipping ($)',full:false},
+    {key:'roas',label:'ROAS',full:false},{key:'orders',label:'Sipariş Adedi',full:false},
+    {sep:'KATEGORİ SATIŞLARI'},
+    {key:'foam_s',label:'Foam+Set Satış ($)',full:false},{key:'foam_a',label:'Foam+Set Reklam ($)',full:false},
+    {key:'gun_s',label:'Foam Gun Satış ($)',full:false},{key:'gun_a',label:'Foam Gun Reklam ($)',full:false},
+    {key:'glue_s',label:'CA Glue Satış ($)',full:false},{key:'glue_a',label:'CA Glue Reklam ($)',full:false},
+    {key:'shine_s',label:'Balloon Shine Satış ($)',full:false},{key:'shine_a',label:'Balloon Shine Reklam ($)',full:false},
+    {key:'arb_s',label:'Arbitrage Satış ($)',full:false},{key:'arb_a',label:'Arbitrage Reklam ($)',full:false},
+    {key:'eth_s',label:'Ethanol Satış ($)',full:false},{key:'eth_a',label:'Ethanol Reklam ($)',full:false},
+    {key:'ws_s',label:'Wholesale Satış ($)',full:false},{key:'ws_a',label:'Wholesale Reklam ($)',full:false},
+  ],
+  Amazon:[
+    {key:'sales',label:'Total Sales ($)',full:false},{key:'units',label:'Total Units',full:false},
+    {key:'cogs',label:'Cost of Goods ($)',full:false},{key:'adv',label:'Ads ($)',full:false},
+    {key:'fees',label:'Amazon Fees ($)',full:false},{key:'gp',label:'Gross Profit ($)',full:false},
+    {key:'margin',label:'Gross Margin (%)',full:false},{key:'ship',label:'Shipping ($)',full:false},
+    {sep:'KATEGORİ KIRIILIMI'},
+    {key:'foam_s',label:'Foam+Set Satış ($)',full:false},{key:'foam_u',label:'Foam+Set Units',full:false},
+    {key:'gun_s',label:'Foam Gun Satış ($)',full:false},{key:'gun_u',label:'Foam Gun Units',full:false},
+    {key:'glue_s',label:'CA Glue Satış ($)',full:false},{key:'glue_u',label:'CA Glue Units',full:false},
+    {key:'shine_s',label:'Balloon Shine Satış ($)',full:false},{key:'shine_u',label:'Balloon Shine Units',full:false},
+    {key:'ws_s',label:'Wholesale Satış ($)',full:false},{key:'ws_u',label:'Wholesale Units',full:false},
+  ],
+  Shopify:[
+    {key:'sales',label:'Total Sales ($)',full:false},{key:'units',label:'Total Units',full:false},
+    {key:'cogs',label:'Cost of Goods ($)',full:false},{key:'fees',label:'Shopify Fees ($)',full:false},
+    {key:'gp',label:'Gross Profit ($)',full:false},{key:'ship',label:'Shipping ($)',full:false},
+    {sep:'KATEGORİ'},
+    {key:'foam_s',label:'Foam Satış ($)',full:false},{key:'foam_u',label:'Foam Units',full:false},
+    {key:'eth_s',label:'Ethanol Satış ($)',full:false},{key:'eth_u',label:'Ethanol Units',full:false},
+    {key:'glue_s',label:'CA Glue Satış ($)',full:false},{key:'glue_u',label:'CA Glue Units',full:false},
+  ],
+  eBay:[
+    {key:'sales',label:'Total Sales ($)',full:false},{key:'units',label:'Total Units',full:false},
+    {key:'cogs',label:'Cost of Goods ($)',full:false},{key:'adv',label:'Ads ($)',full:false},
+    {key:'fees',label:'eBay Fees ($)',full:false},{key:'gp',label:'Gross Profit ($)',full:false},
+    {key:'ship',label:'Shipping ($)',full:false},
+    {sep:'KATEGORİ'},
+    {key:'foam_s',label:'Foam Satış ($)',full:false},{key:'foam_u',label:'Foam Units',full:false},
+    {key:'eth_s',label:'Ethanol Satış ($)',full:false},{key:'eth_u',label:'Ethanol Units',full:false},
+    {key:'glue_s',label:'CA Glue Satış ($)',full:false},{key:'glue_u',label:'CA Glue Units',full:false},
+  ],
+  Walmart:[
+    {key:'sales',label:'Total Sales ($)',full:false},{key:'units',label:'Total Units',full:false},
+    {key:'cogs',label:'Cost of Goods ($)',full:false},{key:'adv',label:'Ads ($)',full:false},
+    {key:'fees',label:'Walmart Fees ($)',full:false},{key:'gp',label:'Gross Profit ($)',full:false},
+    {key:'ship',label:'Shipping ($)',full:false},
+    {sep:'KATEGORİ'},
+    {key:'foam_s',label:'Foam Satış ($)',full:false},{key:'foam_u',label:'Foam Units',full:false},
+    {key:'glue_s',label:'CA Glue Satış ($)',full:false},{key:'glue_u',label:'CA Glue Units',full:false},
+    {key:'shine_s',label:'Balloon Shine Satış ($)',full:false},{key:'shine_u',label:'Balloon Shine Units',full:false},
+  ]
+};
+
+function switchPlatTab(btn){
+  document.querySelectorAll('.plat-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  activePlatTab=btn.dataset.plat;
+  renderPlatForm();
+}
+
+function renderPlatForm(){
+  const fields=PLAT_FIELDS[activePlatTab]||[];
+  let html='<div class="de-grid">';
+  fields.forEach(f=>{
+    if(f.sep){
+      html+=`</div><div class="de-sec-label">${f.sep}</div><div class="de-grid">`;
+    } else {
+      html+=`<div class="de-field ${f.full?'de-full':''}"><label class="de-label">${f.label}</label><input class="de-input" id="f-${f.key}" type="number" step="any" placeholder="0"></div>`;
+    }
+  });
+  html+='</div>';
+  document.getElementById('plat-form').innerHTML=html;
+}
+
+function collectFormData(){
+  const plat=activePlatTab;
+  const month=document.getElementById('de-month').value;
+  const year=parseInt(document.getElementById('de-year').value);
+  const g=key=>{const el=document.getElementById('f-'+key);return el?parseFloat(el.value)||0:0;};
+  const sales=g('sales');
+  if(!sales){alert('En az Satış giriniz.');return null;}
+  return{plat,month,year,sales,units:g('units'),cogs:g('cogs'),adv:g('adv'),fees:g('fees'),gp:g('gp'),margin:g('margin'),ship:g('ship'),roas:g('roas')||null,orders:g('orders'),foam_s:g('foam_s'),foam_a:g('foam_a'),foam_u:g('foam_u'),gun_s:g('gun_s'),gun_a:g('gun_a'),gun_u:g('gun_u'),glue_s:g('glue_s'),glue_a:g('glue_a'),glue_u:g('glue_u'),shine_s:g('shine_s'),shine_a:g('shine_a'),shine_u:g('shine_u'),arb_s:g('arb_s'),arb_a:g('arb_a'),arb_u:g('arb_u'),eth_s:g('eth_s'),eth_a:g('eth_a'),eth_u:g('eth_u'),ws_s:g('ws_s'),ws_a:g('ws_a'),ws_u:g('ws_u'),other_s:g('other_s'),other_a:g('other_a'),other_u:g('other_u')};
+}
+
+function injectEntry(e){
+  const mo=MN.indexOf(e.month);
+  const yr=e.year;
+  if(mo<0||!BASE[yr])return;
+  if(e.plat==='TOTAL'){
+    BASE[yr].sales[mo]=e.sales;BASE[yr].adv[mo]=e.adv;BASE[yr].gp[mo]=e.gp;
+    BASE[yr].margin[mo]=e.margin;BASE[yr].roas[mo]=e.roas;BASE[yr].orders[mo]=e.orders;
+    if(CAT[yr]){
+      if(e.foam_s){CAT[yr].foam.s[mo]=e.foam_s;CAT[yr].foam.a[mo]=e.foam_a||0;}
+      if(e.gun_s){CAT[yr].gun.s[mo]=e.gun_s;CAT[yr].gun.a[mo]=e.gun_a||0;}
+      if(e.glue_s){CAT[yr].glue.s[mo]=e.glue_s;CAT[yr].glue.a[mo]=e.glue_a||0;}
+      if(e.shine_s){CAT[yr].shine.s[mo]=e.shine_s;CAT[yr].shine.a[mo]=e.shine_a||0;}
+      if(e.arb_s){CAT[yr].arb.s[mo]=e.arb_s;CAT[yr].arb.a[mo]=e.arb_a||0;}
+    }
+  } else {
+    const key=`${yr}-${mo+1}`;
+    if(!PLAT_DATA[key])PLAT_DATA[key]={};
+    PLAT_DATA[key][e.plat]={sales:e.sales,units:e.units,cogs:e.cogs,adv:e.adv,fees:e.fees,gp:e.gp,margin:e.margin,ship:e.ship};
+  }
+  ENTRIES.push(e);
+  buildEntryTable();
+}
+
+function saveLocal(){
+  const e=collectFormData();
+  if(!e)return;
+  injectEntry(e);
+  showFeedback('✓ Kaydedildi, grafikler güncellendi','var(--green)');
+  refreshView();
+}
+
+function clearPlatForm(){document.querySelectorAll('#plat-form input').forEach(i=>i.value='');}
+
+function buildEntryTable(){
+  const tb=document.getElementById('tbl-entries');
+  if(!ENTRIES.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:16px;">Henüz veri girilmedi</td></tr>';return;}
+  tb.innerHTML=ENTRIES.map(e=>`<tr><td>${e.month} ${e.year}</td><td>${e.plat}</td><td>${$f(e.sales)}</td><td>${e.units||'—'}</td><td>${$f(e.cogs)}</td><td>${$f(e.adv)}</td><td>${$f(e.fees)}</td><td>${$f(e.gp)}</td><td>${pct(e.margin)}</td></tr>`).join('');
+}
+
+// ── UTILS ──
+function $f(n){if(!n&&n!==0)return'—';const a=Math.abs(n);if(a>=1e6)return'$'+(n/1e6).toFixed(2)+'M';if(a>=1000)return'$'+(n/1000).toFixed(0)+'K';return'$'+Math.round(n);}
+function pct(n){return(!n&&n!==0)?'—':n.toFixed(1)+'%';}
+function xf(n){return n===null||n===undefined?'—':n.toFixed(2)+'x';}
+const GC='rgba(255,255,255,0.04)',TC='#7a8099';
+function mkChart(id,type,labels,datasets,opts={}){
+  if(CI[id])CI[id].destroy();
+  const ctx=document.getElementById(id);if(!ctx)return;
+  CI[id]=new Chart(ctx,{type,data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:opts.legend!==false&&datasets.length>1,labels:{color:TC,font:{size:11},boxWidth:10,padding:12}},tooltip:{backgroundColor:'#1c2030',borderColor:'rgba(255,255,255,0.08)',borderWidth:1,titleColor:'#f0f2f7',bodyColor:TC,padding:10,bodyFont:{size:11,family:'DM Mono'}}},scales:(type==='pie'||type==='doughnut')?{}:{x:{ticks:{color:TC,font:{size:10}},grid:{color:GC},border:{color:'transparent'}},y:{ticks:{color:TC,font:{size:10},callback:opts.pct?v=>v+'%':opts.x?v=>v+'x':opts.raw?v=>v:v=>{const a=Math.abs(v);if(a>=1e6)return'$'+(v/1e6).toFixed(1)+'M';if(a>=1000)return'$'+(v/1000).toFixed(0)+'K';return'$'+v;}},grid:{color:GC},border:{color:'transparent'}}},animation:{duration:350}}});
+}
+function setSpStatus(state,text){const dot=document.getElementById('sp-dot');const txt=document.getElementById('sp-status-text');dot.className='sp-dot '+state;txt.textContent=text;}
+function showModal(){document.getElementById('sp-modal').classList.add('show');}
+function closeModal(){document.getElementById('sp-modal').classList.remove('show');}
+function showLoading(t){document.getElementById('loading-text').textContent=t||'Yükleniyor...';document.getElementById('loading').classList.add('show');}
+function hideLoading(){document.getElementById('loading').classList.remove('show');}
+function showFeedback(msg,color){const el=document.getElementById('de-feedback');el.textContent=msg;el.style.color=color||'var(--green)';el.classList.add('show');setTimeout(()=>el.classList.remove('show'),3000);}
+function activeIdxs(yr){return BASE[yr].sales.map((v,i)=>v>0?i:-1).filter(i=>i>=0);}
+function setF(type,val,btn){const id=type==='year'?'sb-year':type==='plat'?'sb-plat':'sb-cat';document.getElementById(id).querySelectorAll('.chip').forEach(b=>b.classList.remove('active'));btn.classList.add('active');F[type]=val;refreshView();}
+function resetF(){F={year:'2026',plat:'all',cat:'all'};['sb-year','sb-plat','sb-cat'].forEach(id=>{const chips=document.getElementById(id).querySelectorAll('.chip');chips.forEach(c=>c.classList.remove('active'));chips[0].classList.add('active');});refreshView();}
+
+function getSales(yr,i){
+  if(F.cat!=='all'&&CAT[yr]&&CAT[yr][F.cat]&&CAT[yr][F.cat].s[i]!==null)return CAT[yr][F.cat].s[i]||0;
+  if(F.plat!=='all'){const key=`${yr}-${i+1}`;if(PLAT_DATA[key]&&PLAT_DATA[key][F.plat])return PLAT_DATA[key][F.plat].sales||0;}
+  return BASE[yr].sales[i]||0;
+}
+function getAdv(yr,i){
+  if(F.cat!=='all'&&CAT[yr]&&CAT[yr][F.cat])return CAT[yr][F.cat].a[i]||0;
+  if(F.plat!=='all'){const key=`${yr}-${i+1}`;if(PLAT_DATA[key]&&PLAT_DATA[key][F.plat])return PLAT_DATA[key][F.plat].adv||0;}
+  return BASE[yr].adv[i]||0;
+}
+
+// ── VIEWS ──
+function gotoView(name,el){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('view-'+name).classList.add('active');
+  if(name==='trend')buildTrend();
+  else if(name==='category')buildCategory();
+  else if(name==='platform')buildPlatform();
+  else if(name==='dataentry'){renderPlatForm();buildEntryTable();}
+  else buildOverview();
+}
+
+function refreshView(){
+  const active=document.querySelector('.view.active');
+  if(!active)return;
+  const id=active.id.replace('view-','');
+  if(id==='overview')buildOverview();
+  else if(id==='trend')buildTrend();
+  else if(id==='category')buildCategory();
+  else if(id==='platform')buildPlatform();
+}
+
+function buildOverview(){
+  const yr=F.year==='all'?'2026':F.year;
+  const idxs=activeIdxs(yr);
+  const labels=idxs.map(i=>MN[i]);
+  const salesD=idxs.map(i=>getSales(yr,i));
+  const advD=idxs.map(i=>getAdv(yr,i));
+  const ts=salesD.reduce((s,v)=>s+v,0);
+  const ta=advD.reduce((s,v)=>s+v,0);
+  const tg=idxs.reduce((s,i)=>s+BASE[yr].gp[i],0);
+  const to=idxs.reduce((s,i)=>s+BASE[yr].orders[i],0);
+  const validM=idxs.filter(i=>BASE[yr].margin[i]&&BASE[yr].margin[i]!==0);
+  const am=validM.length?validM.reduce((s,i)=>s+BASE[yr].margin[i],0)/validM.length:null;
+  const validR=idxs.filter(i=>BASE[yr].roas[i]&&BASE[yr].roas[i]!==0);
+  const ar=validR.length?validR.reduce((s,i)=>s+BASE[yr].roas[i],0)/validR.length:null;
+
+  document.getElementById('badge-period').textContent=F.year==='all'?'Tüm Yıllar':F.year==='2026'?'2026 — YTD':F.year;
+  document.getElementById('main-chart-sub').textContent=F.cat!=='all'?F.cat.toUpperCase()+' kategorisi':F.plat!=='all'?F.plat+' platformu':'Tüm kategoriler & platformlar';
+
+  const KPIS=[
+    {l:'Toplam Satış',v:$f(ts),m:'',c:'--blue',cls:''},
+    {l:'Gross Profit',v:$f(tg),m:pct(ts?tg/ts*100:0)+' margin',c:'--green',cls:tg/ts>0.18?'up':'warn'},
+    {l:'Reklam Harcaması',v:$f(ta),m:pct(ts?ta/ts*100:0)+' of sales',c:'--red',cls:ta/ts<0.2?'up':'warn'},
+    {l:'Ort. ROAS',v:ar?xf(ar):'—',m:ar?(ar>6?'Hedef üstü ▲':'Hedef altı ▼'):'',c:'--amber',cls:ar&&ar>6?'up':'warn'},
+    {l:'Toplam Sipariş',v:to.toLocaleString(),m:idxs.length+' aylık veri',c:'--purple',cls:'neu'}
+  ];
+  document.getElementById('kpi-row').innerHTML=KPIS.map(k=>`<div class="kpi" style="--kpi-color:var(${k.c})"><div class="kpi-label">${k.l}</div><div class="kpi-val">${k.v}</div><div class="kpi-meta ${k.cls}">${k.m}</div></div>`).join('');
+
+  buildAI(yr,ts,ta,tg,ar,am);
+  mkChart('c-main','bar',labels,[{label:'Satış',data:salesD,backgroundColor:'rgba(79,124,255,0.7)',borderRadius:4,borderSkipped:false},{label:'Reklam',data:advD,backgroundColor:'rgba(255,107,107,0.7)',borderRadius:4,borderSkipped:false}]);
+  mkChart('c-margin','line',labels,[{label:'Margin %',data:idxs.map(i=>BASE[yr].margin[i]),borderColor:'#00d4a0',backgroundColor:'rgba(0,212,160,0.08)',fill:true,tension:0.4,pointRadius:4,spanGaps:true}],{pct:true,legend:false});
+  const hasR=idxs.some(i=>BASE[yr].roas[i]);
+  if(hasR)mkChart('c-roas','line',labels,[{label:'ROAS',data:idxs.map(i=>BASE[yr].roas[i]),borderColor:'#ffc947',backgroundColor:'rgba(255,201,71,0.08)',fill:true,tension:0.4,pointRadius:4,spanGaps:true}],{x:true,legend:false});
+
+  let th='<thead><tr><th>Ay</th><th>Platform</th><th>Satış</th><th>Reklam</th><th>GP</th><th>Margin</th><th>ROAS</th><th>Sipariş</th></tr></thead><tbody>';
+  idxs.forEach(i=>{
+    const key=`${yr}-${i+1}`;
+    const plats=PLAT_DATA[key];
+    const g=BASE[yr].gp[i];
+    const tc=g>50000?'tag-g':g>0?'tag-w':'tag-r';
+    th+=`<tr style="background:var(--surface2)"><td><b>${MN[i]}</b></td><td><span style="color:var(--muted);font-size:11px;">TOTAL</span></td><td>${$f(salesD[i])}</td><td>${$f(advD[i])}</td><td><span class="tag ${tc}">${$f(g)}</span></td><td>${pct(BASE[yr].margin[i])}</td><td>${xf(BASE[yr].roas[i])}</td><td>${BASE[yr].orders[i].toLocaleString()}</td></tr>`;
+    if(plats&&F.plat==='all'){
+      Object.entries(plats).forEach(([p,d])=>{
+        const platColor={Amazon:'var(--amazon)',Shopify:'var(--shopify)',eBay:'var(--ebay)',Walmart:'var(--walmart)'}[p]||'var(--muted)';
+        th+=`<tr><td></td><td><span style="color:${platColor};font-size:11px;">↳ ${p}</span></td><td>${$f(d.sales)}</td><td>${$f(d.adv)}</td><td>${$f(d.gp)}</td><td>${pct(d.margin)}</td><td>—</td><td>${d.units?.toLocaleString()||'—'}</td></tr>`;
+      });
+    }
+  });
+  th+='</tbody>';
+  document.getElementById('tbl-main').innerHTML=th;
+}
+
+function buildAI(yr,ts,ta,tg,ar,am){
+  document.getElementById('ai-sub').textContent=yr+' · Seçili döneme ait AI değerlendirmesi';
+  const advR=(ta/ts*100).toFixed(1),mgn=(tg/ts*100).toFixed(1);
+  let ozet='',sinyaller=[];
+  if(yr==='2026'){
+    ozet=`Yılın ilk iki ayında toplam <span class="hi">${$f(ts)}</span> satış gerçekleşti. Ocak'tan Şubat'a <span class="hi">%5 artış</span> ($889K→$934K). Gross margin <span class="${parseFloat(mgn)>17?'hi':'wi'}">${mgn}%</span>. Reklam harcamaları satışın <span class="wi">${advR}%</span>'ini oluşturuyor — 2025'e göre yüksek.`;
+    sinyaller=['Foam kategorisi Şubat\'ta <span class="hi">$572K</span> — toplam satışın %61\'i','ROAS <span class="'+(ar&&ar>5.5?'hi':'wi')+'">'+(ar?xf(ar):'—')+'</span> — 2025 ortalaması 6.65x idi','Arbitrage $178K ile 2. büyük kalem, düşük reklam maliyeti avantaj','Amazon dominant (%75), Shopify büyüyor (%16)'];
+  } else if(yr==='2025'){
+    ozet=`2025 güçlü büyüme: toplam <span class="hi">${$f(ts)}</span>. Ekim–Kasım zirve. Q1 margin <span class="hi">%23.8</span> yılın en yüksek seviyesi.`;
+    sinyaller=['Haziran ROAS <span class="wi">5.45x</span> — yılın en düşük seviyesi','Q4 toplam $2.1M — güçlü sezonsal zirve','Foam yıl boyunca dominant, Ağustos\'tan hızlanma','ROAS yıl sonu baskı altında — reklam verimliliği izlenmeli'];
+  } else {
+    ozet=`2024 dönüşüm yılı: <span class="hi">${$f(ts)}</span>. Ocak–Şubat negatif marjin, Mayıs'tan güçlü toparlanma.`;
+    sinyaller=['Ocak–Şubat negatif margin — başlangıç maliyetleri yüksekti','Mayıs zirve <span class="hi">$41K</span> GP','Eylül–Ekim güçlü momentum','Aralık düşüşü — sezon kapanması etkisi'];
+  }
+  document.getElementById('ai-grid').innerHTML=`<div class="ai-block"><div class="ai-block-title">Dönem Özeti</div><div class="ai-text">${ozet}</div></div><div class="ai-block"><div class="ai-block-title">Önemli Sinyaller</div><ul class="ins-list">${sinyaller.map(s=>`<li><span class="ins-arr">→</span><span>${s}</span></li>`).join('')}</ul></div>`;
+}
+
+function buildTrend(){
+  mkChart('c-yoy-s','line',MN,[{label:'2024',data:BASE[2024].sales,borderColor:'#444',tension:0.4,pointRadius:2,borderDash:[4,4]},{label:'2025',data:BASE[2025].sales,borderColor:'#4f7cff',backgroundColor:'rgba(79,124,255,0.05)',fill:true,tension:0.4,pointRadius:2},{label:'2026',data:BASE[2026].sales.map(v=>v||null),borderColor:'#00d4a0',backgroundColor:'rgba(0,212,160,0.07)',fill:true,tension:0.4,pointRadius:5,borderWidth:2,spanGaps:false}]);
+  mkChart('c-yoy-gp','bar',MN,[{label:'2024',data:BASE[2024].gp,backgroundColor:'rgba(68,68,68,0.6)',borderRadius:3},{label:'2025',data:BASE[2025].gp,backgroundColor:'rgba(79,124,255,0.6)',borderRadius:3},{label:'2026',data:BASE[2026].gp.map(v=>v||null),backgroundColor:'rgba(0,212,160,0.7)',borderRadius:3}]);
+  mkChart('c-yoy-m','line',MN,[{label:'2024',data:BASE[2024].margin,borderColor:'#444',tension:0.4,pointRadius:2,borderDash:[4,4],spanGaps:true},{label:'2025',data:BASE[2025].margin,borderColor:'#4f7cff',tension:0.4,pointRadius:2},{label:'2026',data:BASE[2026].margin.map(v=>v||null),borderColor:'#00d4a0',tension:0.4,pointRadius:4,borderWidth:2,spanGaps:false}],{pct:true});
+  mkChart('c-yoy-r','line',MN,[{label:'2025',data:BASE[2025].roas,borderColor:'#4f7cff',tension:0.4,pointRadius:3,spanGaps:true},{label:'2026',data:BASE[2026].roas.map(v=>v||null),borderColor:'#00d4a0',tension:0.4,pointRadius:5,borderWidth:2,spanGaps:false}],{x:true});
+  mkChart('c-yoy-o','bar',MN,[{label:'2024',data:BASE[2024].orders,backgroundColor:'rgba(68,68,68,0.6)',borderRadius:3},{label:'2025',data:BASE[2025].orders,backgroundColor:'rgba(79,124,255,0.6)',borderRadius:3},{label:'2026',data:BASE[2026].orders.map(v=>v||null),backgroundColor:'rgba(0,212,160,0.7)',borderRadius:3}],{raw:true});
+}
+
+function buildCategory(){
+  const yr=F.year==='all'||F.year==='2024'?'2025':F.year;
+  const cat=CAT[yr];const idxs=activeIdxs(yr);const labels=idxs.map(i=>MN[i]);
+  document.getElementById('cat-sub').textContent=yr+' · '+idxs.length+' aylık veri';
+  const cats=F.cat!=='all'?[F.cat]:['foam','gun','glue','shine','arb'];
+  const CN={foam:'Foam+Set',gun:'Foam Gun',glue:'CA Glue',shine:'Balloon Shine',arb:'Arbitrage'};
+  const CC={foam:'#4f7cff',gun:'#00d4a0',glue:'#ff6b6b',shine:'#ffc947',arb:'#a78bfa'};
+  const totals=cats.map(c=>idxs.reduce((s,i)=>s+(cat[c].s[i]||0),0));
+  const roasC=cats.map(c=>{const ts=idxs.reduce((s,i)=>s+(cat[c].s[i]||0),0);const ta=idxs.reduce((s,i)=>s+(cat[c].a[i]||0),0);return ta>0?+(ts/ta).toFixed(2):null;});
+  mkChart('c-cat-pie','doughnut',cats.map(c=>CN[c]),[{data:totals,backgroundColor:cats.map(c=>CC[c]),borderWidth:0,hoverOffset:6}],{extra:{plugins:{legend:{display:true,position:'bottom',labels:{color:TC,font:{size:11},boxWidth:10,padding:12}}}}});
+  mkChart('c-cat-roas','bar',cats.map(c=>CN[c]),[{data:roasC,backgroundColor:cats.map(c=>CC[c]),borderRadius:4,borderSkipped:false}],{x:true,legend:false});
+  mkChart('c-cat-trend','line',labels,cats.map(c=>({label:CN[c],data:idxs.map(i=>cat[c].s[i]||null),borderColor:CC[c],tension:0.4,pointRadius:2,spanGaps:true})));
+  mkChart('c-cat-adv','bar',labels,cats.map(c=>({label:CN[c],data:idxs.map(i=>cat[c].a[i]||0),backgroundColor:CC[c]+'99',borderRadius:3,borderSkipped:false})));
+}
+
+function buildPlatform(){
+  const yr=F.year==='all'?'2026':F.year;
+  const idxs=activeIdxs(yr);
+  // Aggregate platform data across selected months
+  const platTotals={Amazon:{sales:0,units:0,cogs:0,adv:0,fees:0,gp:0},Shopify:{sales:0,units:0,cogs:0,adv:0,fees:0,gp:0},eBay:{sales:0,units:0,cogs:0,adv:0,fees:0,gp:0},Walmart:{sales:0,units:0,cogs:0,adv:0,fees:0,gp:0}};
+  let hasPlat=false;
+  idxs.forEach(i=>{const key=`${yr}-${i+1}`;if(PLAT_DATA[key]){hasPlat=true;Object.entries(PLAT_DATA[key]).forEach(([p,d])=>{if(platTotals[p]){platTotals[p].sales+=d.sales||0;platTotals[p].units+=d.units||0;platTotals[p].cogs+=d.cogs||0;platTotals[p].adv+=d.adv||0;platTotals[p].fees+=d.fees||0;platTotals[p].gp+=d.gp||0;}});}});
+  const platList=Object.entries(platTotals);
+  document.getElementById('plat-period-sub').textContent=yr+' · '+idxs.length+' aylık toplam';
+  document.getElementById('plat-tbl-title').textContent='Platform Detay — '+yr;
+  const PC={Amazon:'var(--amazon)',Shopify:'var(--shopify)',eBay:'var(--ebay)',Walmart:'var(--walmart)'};
+  document.getElementById('plat-cards').innerHTML=platList.map(([p,d])=>`<div class="plat-card"><div class="plat-name" style="color:${PC[p]}">${p}</div><div class="plat-val">${$f(d.sales)}</div><div class="plat-meta">${d.units.toLocaleString()} adet<br>Reklam: ${$f(d.adv)}<br>GP: ${$f(d.gp)}</div><div class="plat-bar" style="background:${PC[p]};width:${d.sales?(d.sales/platTotals.Amazon.sales*100).toFixed(0):0}%"></div></div>`).join('');
+  const platNames=platList.map(([p])=>p);
+  mkChart('c-plat-bar','bar',platNames,[{label:'Satış',data:platList.map(([,d])=>d.sales),backgroundColor:'rgba(79,124,255,0.7)',borderRadius:4,borderSkipped:false},{label:'GP',data:platList.map(([,d])=>d.gp),backgroundColor:'rgba(0,212,160,0.7)',borderRadius:4,borderSkipped:false},{label:'Reklam',data:platList.map(([,d])=>d.adv),backgroundColor:'rgba(255,107,107,0.6)',borderRadius:4,borderSkipped:false}]);
+  mkChart('c-plat-pie','doughnut',platNames,[{data:platList.map(([,d])=>d.sales),backgroundColor:['#ff9500','#00d4a0','#4f7cff','#ffc947'],borderWidth:0,hoverOffset:6}],{extra:{plugins:{legend:{display:true,position:'bottom',labels:{color:TC,font:{size:11},boxWidth:10,padding:12}}}}});
+  mkChart('c-plat-gp','bar',platNames,[{data:platList.map(([,d])=>d.gp),backgroundColor:platList.map(([p])=>({Amazon:'rgba(255,149,0,0.7)',Shopify:'rgba(0,212,160,0.7)',eBay:'rgba(79,124,255,0.7)',Walmart:'rgba(255,201,71,0.7)'})[p]),borderRadius:4,borderSkipped:false}],{legend:false});
+  let tblH='<thead><tr><th>Platform</th><th>Satış</th><th>Units</th><th>COGS</th><th>Reklam</th><th>Fees</th><th>GP</th><th>Margin</th></tr></thead><tbody>';
+  platList.forEach(([p,d])=>{const m=d.sales?d.gp/d.sales*100:0;const tc=m>20?'tag-g':m>5?'tag-w':'tag-r';tblH+=`<tr><td style="color:${PC[p]};font-weight:600;">${p}</td><td>${$f(d.sales)}</td><td>${d.units.toLocaleString()}</td><td>${$f(d.cogs)}</td><td>${$f(d.adv)}</td><td>${$f(d.fees)}</td><td><span class="tag ${tc}">${$f(d.gp)}</span></td><td>${pct(m)}</td></tr>`;});
+  tblH+='</tbody>';
+  document.getElementById('tbl-plat').innerHTML=tblH;
+}
+
+// INIT
+buildOverview();
+renderPlatForm();
+buildEntryTable();
+</script>
+</body>
+</html>
