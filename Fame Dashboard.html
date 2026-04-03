@@ -407,54 +407,64 @@ const PLAT_DATA={
 };
 
 // ── MSAL / GRAPH ──
+const MSAL_CONFIG={auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:'https://fame-marketing-dashboard.netlify.app'},cache:{cacheLocation:'localStorage',storeAuthStateInCookie:true}};
+
 function loadMSAL(){
   return new Promise((resolve)=>{
     if(window.msal){resolve();return;}
     const s=document.createElement('script');
     s.src='https://cdnjs.cloudflare.com/ajax/libs/microsoft-authentication-library/2.38.0/msal-browser.min.js';
-    s.onload=resolve;
-    document.head.appendChild(s);
+    s.onload=resolve;document.head.appendChild(s);
   });
+}
+
+async function initMSAL(){
+  await loadMSAL();
+  if(!msalInstance){
+    msalInstance=new msal.PublicClientApplication(MSAL_CONFIG);
+    await msalInstance.initialize();
+    const resp=await msalInstance.handleRedirectPromise();
+    if(resp&&resp.accessToken){
+      accessToken=resp.accessToken;
+      const acc=msalInstance.getAllAccounts()[0];
+      document.getElementById('user-badge').textContent='◈ '+acc.name;
+      setSpStatus('connecting','Veri yükleniyor...');
+      showLoading('Excel verisi okunuyor...');
+      try{await loadFromSharePoint();setSpStatus('connected','SharePoint Bağlı');spConnected=true;}
+      catch(e){setSpStatus('disconnected','Veri Hatası: '+e.message);}
+      hideLoading();
+    } else {
+      const accounts=msalInstance.getAllAccounts();
+      if(accounts.length>0){
+        try{
+          const sr=await msalInstance.acquireTokenSilent({scopes:CONFIG.scopes,account:accounts[0]});
+          accessToken=sr.accessToken;
+          document.getElementById('user-badge').textContent='◈ '+accounts[0].name;
+          setSpStatus('connecting','Veri yükleniyor...');
+          showLoading('Excel verisi okunuyor...');
+          try{await loadFromSharePoint();setSpStatus('connected','SharePoint Bağlı');spConnected=true;}
+          catch(e){setSpStatus('disconnected','Veri Hatası');}
+          hideLoading();
+        }catch(e){console.log('Silent failed');}
+      }
+    }
+  }
 }
 
 async function connectSharePoint(){
   closeModal();
-  showLoading('Microsoft hesabınıza giriş yapılıyor...');
-  try{
-    await loadMSAL();
-    msalInstance=new msal.PublicClientApplication({
-      auth:{clientId:CONFIG.clientId,authority:`https://login.microsoftonline.com/${CONFIG.tenantId}`,redirectUri:window.location.origin+window.location.pathname},
-      cache:{cacheLocation:'sessionStorage'}
-    });
-    await msalInstance.initialize();
-    const resp=await msalInstance.loginPopup({scopes:CONFIG.scopes});
-    accessToken=resp.accessToken;
-    const acc=msalInstance.getAllAccounts()[0];
-    document.getElementById('user-badge').textContent='◈ '+acc.name;
-    showLoading('Excel verisi okunuyor...');
-    await loadFromSharePoint();
-    setSpStatus('connected','SharePoint Bağlı');
-    spConnected=true;
-    hideLoading();
-  }catch(e){
-    hideLoading();
-    setSpStatus('disconnected','Bağlantı Hatası');
-    alert('Giriş hatası: '+e.message+'\n\nNot: Redirect URI olarak portal.azure.com\'da localhost eklenmiş olmalı.');
-  }
+  await loadMSAL();
+  if(!msalInstance){msalInstance=new msal.PublicClientApplication(MSAL_CONFIG);await msalInstance.initialize();}
+  await msalInstance.loginRedirect({scopes:CONFIG.scopes,prompt:'select_account'});
 }
 
 async function getToken(){
   if(!msalInstance)return null;
-  try{
-    const acc=msalInstance.getAllAccounts()[0];
-    const r=await msalInstance.acquireTokenSilent({scopes:CONFIG.scopes,account:acc});
-    return r.accessToken;
-  }catch{
-    const r=await msalInstance.acquireTokenPopup({scopes:CONFIG.scopes});
-    return r.accessToken;
-  }
+  const acc=msalInstance.getAllAccounts()[0];
+  if(!acc)return null;
+  try{const r=await msalInstance.acquireTokenSilent({scopes:CONFIG.scopes,account:acc});return r.accessToken;}
+  catch(e){await msalInstance.acquireTokenRedirect({scopes:CONFIG.scopes,account:acc});return null;}
 }
-
 async function loadFromSharePoint(){
   const token=await getToken();
   const url=`https://graph.microsoft.com/v1.0/drives/root/items/${CONFIG.fileId}/workbook/worksheets/${CONFIG.sheetName}/usedRange`;
@@ -830,6 +840,7 @@ function buildPlatform(){
 }
 
 // INIT
+initMSAL();
 buildOverview();
 renderPlatForm();
 buildEntryTable();
